@@ -9,9 +9,9 @@ base = []
 def receive_data():
     global base
     data = request.get_json()
-    temp_data = data['temp_data']
-    hum_data = data['temp_data']
-    intensitas = data['intensitas']
+    temp_data = data['temperature']
+    hum_data = data['humidity']
+    intensitas = data['Lux']
     pengunjung = data['pengunjung']
     SubData = [temp_data, hum_data, intensitas, pengunjung]
 
