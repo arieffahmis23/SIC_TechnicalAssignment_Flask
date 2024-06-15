@@ -8,7 +8,7 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // Your server URL
-const char* serverUrl = "http://localhost:5000/data"; // Change to your server's local IP address
+const char* serverUrl = "http://192.168.1.6:5000/data"; // Change to your server's local IP address
 
 #define DHTPIN 25  // GPIO pin where the DHT22 is connected
 #define ldr 36
@@ -16,6 +16,7 @@ const char* serverUrl = "http://localhost:5000/data"; // Change to your server's
 #define Relay_Lamp 2
 #define Relay_AC 17
 
+#define DEBUG_ESP_HTTP_CLIENT
 #define DHTTYPE DHT22
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -42,7 +43,8 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nConnected to Wi-Fi");
+  Serial.print("Connected to WiFi network with IP Address: ");
+  Serial.println(WiFi.localIP());
 }
 
 void loop() {
@@ -114,7 +116,7 @@ void loop() {
     HTTPClient http;
 
     http.begin(serverUrl);
-    http.addHeader("Content-Type", "raw/json");
+    http.addHeader("Content-Type", "application/json");
 
     String payload = "{\"temperature\":" + String(temp_data) + ",\"humidity\":" + String(hum_data) + ",\"Lux\":" + String(intensitas) + ",\"pengunjung\":" + String(pengunjung) + "}";
 
