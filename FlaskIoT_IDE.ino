@@ -22,6 +22,10 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 DHT dht(DHTPIN, DHTTYPE);
 
+// Timer variables
+unsigned long lastTime = 0;
+unsigned long timerDelay = 5000; // Timer set to 5 seconds (5000)
+
 const float GAMMA = 0.7;
 const float RL10 = 50;
 int pengunjung = 0;
@@ -47,94 +51,95 @@ void setup() {
 }
 
 void loop() {
-  // Read temperature and humidity from DHT22
-  float temp_data = dht.readTemperature();
-  float hum_data = dht.readHumidity();
+  if ((millis() - lastTime) > timerDelay) {
+    // Check WiFi connection status
+    if(WiFi.status()== WL_CONNECTED){
+      // Read temperature and humidity from DHT22
+      float temp_data = dht.readTemperature();
+      float hum_data = dht.readHumidity();
 
-  int data_ldr = analogRead(ldr);
-  int data_pir = digitalRead(pir);
-  float voltage = data_ldr / 4095.0 * 5.0;
-  float resistance = 2000 * voltage / (1 - voltage / 5.0);
-  float intensitas = pow(RL10 * 1e3 * pow(10, GAMMA) / resistance, (1 / GAMMA));
+      int data_pir = digitalRead(pir);
+      int data_ldr = analogRead(ldr);
+      
+      float voltage = data_ldr / 4095.0 * 5.0;
+      float resistance = 2000 * voltage / (1 - voltage / 5.0);
+      float intensitas = pow(RL10 * 1e3 * pow(10, GAMMA) / resistance, (1 / GAMMA));
 
+      // Check if any reads failed
+      if (isnan(temp_data) || isnan(hum_data)) {
+        Serial.println("Failed to read from DHT sensor!");
+        return;
+      }
 
-  // Check if any reads failed
-  if (isnan(temp_data) || isnan(hum_data)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return;
-  }
+      lcd.setCursor(0,0);
+      lcd.print("Temp = ");
+      lcd.print(temp_data);
+      lcd.setCursor(0,1);
+      lcd.print("Hum = ");
+      lcd.print(hum_data);
 
-  lcd.setCursor(0,0);
-  lcd.print("Temp = ");
-  lcd.print(temp_data);
-  lcd.setCursor(0,1);
-  lcd.print("Hum = ");
-  lcd.print(hum_data);
+      // Print values to serial monitor
+      Serial.print("Temperature: ");
+      Serial.print(temp_data);
+      Serial.print(" °C, Humidity: ");
+      Serial.print(hum_data);
+      Serial.println(" %");
+      Serial.print("Intensitas Cahaya : ");
+      Serial.print(intensitas);
+      Serial.println(" lux");
 
-  // Print values to serial monitor
-  Serial.print("Temperature: ");
-  Serial.print(temp_data);
-  Serial.print(" °C, Humidity: ");
-  Serial.print(hum_data);
-  Serial.println(" %");
-  Serial.print("Intensitas Cahaya : ");
-  Serial.print(intensitas);
-  Serial.println(" lux");
+      if(temp_data >= 40){
+        digitalWrite(Relay_AC, HIGH);
+        Serial.println("AC Menyala");
+      }
+      else{
+        digitalWrite(Relay_AC,LOW);
+        Serial.println("AC Mati");
+      }
 
-  if(temp_data >= 40){
-      digitalWrite(Relay_AC, HIGH);
-      Serial.println("AC Menyala");
-  }
-  else{
-    digitalWrite(Relay_AC,LOW);
-    Serial.println("AC Mati");
-  }
+      if(intensitas > 400){
+        digitalWrite(Relay_Lamp, LOW);
+        Serial.println("Lampu Mati");
+      }
+      else{
+        digitalWrite(Relay_Lamp, HIGH);
+        Serial.println("Lampu Menyala");
+      }
 
-  if(intensitas > 400){
-    digitalWrite(Relay_Lamp, LOW);
-    Serial.println("Lampu Mati");
-  }
-  else{
-    digitalWrite(Relay_Lamp, HIGH);
-    Serial.println("Lampu Menyala");
-  }
+      if(data_pir == 1){
+        Serial.println("Terdapat Pengunjung");
+        pengunjung++;
+        Serial.print("Jumlah Pengunjung :");
+        Serial.println(pengunjung);
+      }
+      else{
+        Serial.print("Jumlah Pengunjung :");
+        Serial.println(pengunjung);
+      }
 
-  if(data_pir == 1){
-    Serial.println("Terdapat Pengunjung");
-    pengunjung++;
-    Serial.print("Jumlah Pengunjung :");
-    Serial.println(pengunjung);
-  }
-  else{
-    Serial.print("Jumlah Pengunjung :");
-    Serial.println(pengunjung);
-  }
+      // Send data to server
+      HTTPClient http;
 
-  // Send data to server
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
+      http.begin(serverUrl);
+      http.addHeader("Content-Type", "application/json");
 
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
+      String payload = "{\"temperature\":" + String(temp_data) + ",\"humidity\":" + String(hum_data) + ",\"Lux\":" + String(intensitas) + ",\"pengunjung\":" + String(pengunjung) + "}";
 
-    String payload = "{\"temperature\":" + String(temp_data) + ",\"humidity\":" + String(hum_data) + ",\"Lux\":" + String(intensitas) + ",\"pengunjung\":" + String(pengunjung) + "}";
+      int httpResponseCode = http.POST(payload);
 
-    int httpResponseCode = http.POST(payload);
+      if (httpResponseCode > 0) {
+        String response = http.getString();
+        Serial.println("HTTP Response code: " + String(httpResponseCode));
+        Serial.println("Response: " + response);
+      } else {
+        Serial.println("Error on sending POST: " + String(httpResponseCode));
+      }
+      http.end();
 
-    if (httpResponseCode > 0) {
-      String response = http.getString();
-      Serial.println("HTTP Response code: " + String(httpResponseCode));
-      Serial.println("Response: " + response);
     } else {
-      Serial.println("Error on sending POST: " + String(httpResponseCode));
+      Serial.println("WiFi Disconnected");
     }
-
-    http.end();
-  } else {
-    Serial.println("WiFi Disconnected");
-  }
-
+  lastTime = millis();
   Serial.println("----------------------------------------------");
-  // Send a request every 10 seconds
-  delay(10000);
+  }
 }
