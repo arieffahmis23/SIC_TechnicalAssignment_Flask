@@ -20,8 +20,8 @@ def receive_data():
 
     # Log the received data
     print("Data diterima")
-    print("- Suhu:", temp_data, "°C, Kelembaban:", hum_data, "%")
-    print("- Intensitas Cahaya:", intensitas,", lux :", intensitas, ", Pengunjung:", pengunjung)
+    print("- Suhu :", temp_data, "°C, Kelembaban :", hum_data, "%")
+    print("- Intensitas Cahaya :", intensitas, "lux, Pengunjung :", pengunjung)
     
     # Send response
     response = {'message': 'Data diterima'}
